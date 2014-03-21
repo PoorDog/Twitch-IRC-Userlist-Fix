@@ -1,10 +1,14 @@
-import json
-import urllib2
+#!/usr/bin/env python3
+
+import requests
 import hexchat
 import threading
 
 __module_name__ = 'Twitch IRC Userlist Fix'
-__module_description__ = 'XChat/HexChat plugin that periodically retrieves the userlist for all joined channels on the Twitch IRC servers from their website. This plugin is needed for some smaller channels in which the IRC server does not respond properly to userlist requests, causing the userlist in the clients to stay empty.'
+__module_description__ = 'XChat/HexChat plugin that periodically retrieves the userlist for all joined channels on ' \
+                         'the Twitch IRC servers from their website. This plugin is needed for some smaller channels ' \
+                         'in which the IRC server does not respond properly to userlist requests, causing the ' \
+                         'userlist in the clients to stay empty.'
 __module_version__ = '0.3.1'
 __module_author__ = 'cryzed <cryzed@googlemail.com>'
 
@@ -25,7 +29,7 @@ userlists_updates = {}
 userlists_updates_lock = threading.Semaphore()
 
 
-class start_new_thread(threading.Thread):
+class StartNewThread(threading.Thread):
     def __init__(self, callback, *args, **kwargs):
         threading.Thread.__init__(self)
         self.setDaemon(True)
@@ -59,17 +63,17 @@ def mode(nickname, channel, flags, target, context=hexchat):
 
 def retrieve_userlist_update_callback(userdata):
     url, channel_key = userdata
-    start_new_thread(retrieve_userlist_update_thread, url, channel_key)
+    StartNewThread(retrieve_userlist_update_thread, url, channel_key)
     return 1
 
 
 def retrieve_userlist_update_thread(url, channel_key):
     try:
-        response = urllib2.urlopen(url)
-    except urllib2.URLError:
+        response = requests.get(url)
+    except requests.exceptions.RequestException:
         return
 
-    userlist = json.load(response)['chatters']
+    userlist = response.json()['chatters']
     with userlists_updates_lock:
         userlists_updates[channel_key] = userlist
 
@@ -150,7 +154,7 @@ def end_of_names_callback(word, word_eol, userdata):
     channel_key = server + current_channel
 
     hexchat.hook_timer(RETRIEVE_USERLIST_TIMEOUT, retrieve_userlist_update_callback, (url, channel_key))
-    start_new_thread(retrieve_userlist_update_thread, url, channel_key)
+    StartNewThread(retrieve_userlist_update_thread, url, channel_key)
 
     channel = None
     for channel in hexchat.get_list('channels'):
@@ -174,4 +178,4 @@ if __name__ == '__main__':
     ]
 
     hexchat.hook_unload(unload_callback, hooks)
-    print __module_name__, __module_version__, 'loaded successfully.'
+    print(__module_name__, __module_version__, 'loaded successfully.')
